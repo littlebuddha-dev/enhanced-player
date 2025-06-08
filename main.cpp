@@ -1,5 +1,4 @@
-// littlebuddha-dev/enhanced-player/enhanced-player-08b6ca5fd163116ffefc8ab54b1c2ab6ccda0410/main.cpp
-// ./main.cpp - 安定性向上版リアルタイム再生エンジン
+// ./main.cpp - 安定性・堅牢性向上版リアルタイム再生エンジン v2.2
 #include <iostream>
 #include <vector>
 #include <string>
@@ -15,6 +14,7 @@
 #include <condition_variable>
 #include <queue>
 #include <memory>
+#include <filesystem>
 
 // 3rd party libraries
 #include <sndfile.h>
@@ -170,16 +170,17 @@ private:
 // --- 改良版リアルタイムオーディオエンジン ---
 class RealtimeAudioEngine {
 public:
+    // --- 修正点: enum class を public の先頭に移動 ---
     enum class PlaybackState { STOPPED, PLAYING, PAUSED };
 
-    RealtimeAudioEngine(const std::string& audio_file_path) 
+    RealtimeAudioEngine(const std::string& audio_file_path, const std::string& executable_path) 
         : audio_file_(audio_file_path), ring_buffer_(RING_BUFFER_SIZE) {
         
         if (!audio_file_.isValid()) {
             throw std::runtime_error("Failed to initialize audio file");
         }
         
-        load_parameters();
+        load_parameters(executable_path);
         
         const SF_INFO& info = audio_file_.getInfo();
         channels_ = info.channels;
@@ -305,15 +306,23 @@ private:
     std::condition_variable loading_cv_;
     std::mutex loading_mutex_;
     
-    void load_parameters() {
+    void load_parameters(const std::string& executable_path) {
         try {
-            std::ifstream f("params.json");
+            std::filesystem::path exe_path(executable_path);
+            std::filesystem::path config_path = exe_path.parent_path() / "params.json";
+
+            std::cout << "Loading parameters from: " << config_path.string() << std::endl;
+
+            std::ifstream f(config_path);
             if (f.is_open()) {
                 params_ = json::parse(f, nullptr, false);
                 if (params_.is_discarded()) {
-                    std::cerr << "Warning: Invalid JSON in params.json, using defaults" << std::endl;
+                    std::cerr << "Warning: Invalid JSON in " << config_path.string() << ", using defaults" << std::endl;
                     params_ = json::object();
                 }
+            } else {
+                 std::cerr << "Warning: Could not open " << config_path.string() << ", using defaults" << std::endl;
+                 params_ = json::object();
             }
         } catch (const std::exception& e) {
             std::cerr << "Warning: Failed to load params.json: " << e.what() << std::endl;
@@ -382,10 +391,8 @@ private:
             if (playback_state_ == PlaybackState::PLAYING) {
                 lock.unlock();
                 
-                // ファイルからデータ読み込み
                 sf_count_t frames_read = audio_file_.read(temp_buffer.data(), FRAMES_PER_BUFFER);
                 if (frames_read <= 0) {
-                    // ファイル終端に達した
                     std::lock_guard<std::mutex> state_lock(state_mutex_);
                     if (playback_state_ == PlaybackState::PLAYING) {
                         playback_state_ = PlaybackState::STOPPED;
@@ -393,7 +400,6 @@ private:
                     continue;
                 }
                 
-                // リサンプリング処理
                 if (resampler_state_) {
                     SRC_DATA src_data;
                     src_data.data_in = temp_buffer.data();
@@ -409,16 +415,13 @@ private:
                         continue;
                     }
                     
-                    // リサンプル済みデータをリングバッファにプッシュ
                     size_t samples_to_push = src_data.output_frames_gen * channels_;
-                    if (!ring_buffer_.push(resampled_buffer.data(), samples_to_push)) {
-                        // バッファがフル - 少し待つ
+                    while (!ring_buffer_.push(resampled_buffer.data(), samples_to_push)) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     }
                 } else {
-                    // リサンプリング不要
                     size_t samples_to_push = frames_read * channels_;
-                    if (!ring_buffer_.push(temp_buffer.data(), samples_to_push)) {
+                    while (!ring_buffer_.push(temp_buffer.data(), samples_to_push)) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     }
                 }
@@ -427,7 +430,6 @@ private:
     }
     
     int processAudio(float* output_buffer, unsigned long frames_per_buffer) {
-        // 再生停止時は無音を出力
         if (playback_state_ != PlaybackState::PLAYING) {
             std::fill(output_buffer, output_buffer + (frames_per_buffer * channels_), 0.0f);
             return paContinue;
@@ -436,34 +438,25 @@ private:
         size_t samples_needed = frames_per_buffer * channels_;
         std::vector<float> processing_buffer(samples_needed);
         
-        // リングバッファからデータを取得
         size_t samples_read = ring_buffer_.pop(processing_buffer.data(), samples_needed);
         
-        if (samples_read == 0) {
-            // アンダーラン - 無音を出力してローディングを促す
-            std::fill(output_buffer, output_buffer + samples_needed, 0.0f);
-            loading_cv_.notify_all();
-            return paContinue;
-        }
-        
-        // 不足分は無音で埋める
         if (samples_read < samples_needed) {
             std::fill(processing_buffer.data() + samples_read, 
                      processing_buffer.data() + samples_needed, 0.0f);
+            loading_cv_.notify_all();
         }
         
-        // エフェクト処理
         try {
             effect_chain_.process(processing_buffer);
         } catch (const std::exception& e) {
             std::cerr << "Effect processing error: " << e.what() << std::endl;
         }
         
-        // 出力バッファにコピー
         std::copy(processing_buffer.begin(), processing_buffer.end(), output_buffer);
         
-        // ローディングスレッドに通知
-        loading_cv_.notify_all();
+        if (ring_buffer_.available_read() < PREFILL_THRESHOLD * channels_) {
+            loading_cv_.notify_all();
+        }
         
         return paContinue;
     }
@@ -494,10 +487,10 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    std::cout << "=== Real-Time Sound Enhancer Engine v2.0 (Stability Enhanced) ===" << std::endl;
+    std::cout << "=== Real-Time Sound Enhancer Engine v2.2 (Robust Path Handling) ===" << std::endl;
     
     try {
-        RealtimeAudioEngine engine(argv[1]);
+        RealtimeAudioEngine engine(argv[1], argv[0]);
         
         if (start_time > 0.0) {
             engine.seek(start_time);
@@ -510,7 +503,6 @@ int main(int argc, char* argv[]) {
         while (engine.isPlaying() || line != "exit") {
             std::cout << "> ";
             if (!std::getline(std::cin, line)) {
-                // EOF reached
                 engine.stop();
                 break;
             }
@@ -555,6 +547,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    std::cout << "Goodbye!" << std::endl;
+    std::cout << "\nGoodbye!" << std::endl;
     return 0;
 }
