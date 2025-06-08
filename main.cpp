@@ -1,3 +1,4 @@
+// littlebuddha-dev/enhanced-player/enhanced-player-08b6ca5fd163116ffefc8ab54b1c2ab6ccda0410/main.cpp
 // ./main.cpp - リアルタイム再生エンジン (引数エラー修正版)
 #include <iostream>
 #include <vector>
@@ -36,7 +37,12 @@ public:
     AudioFile(const std::string& path) {
         sfinfo_.format = 0;
         file_ = sf_open(path.c_str(), SFM_READ, &sfinfo_);
-        if (!file_) throw std::runtime_error("Could not open audio file: " + path);
+        if (!file_) {
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+            // ★ ここを修正: エラーメッセージを具体的にする ★
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+            throw std::runtime_error("Could not open audio file: " + path + ". Check path and ensure format is supported (e.g., WAV, FLAC, AIFF, OGG).");
+        }
     }
     ~AudioFile() { if (file_) sf_close(file_); }
     sf_count_t read(float* buffer, sf_count_t frames) { return sf_readf_float(file_, buffer, frames); }
@@ -93,9 +99,6 @@ public:
             if (!resampler_state_) throw std::runtime_error(std::string("src_new failed: ") + src_strerror(error));
         }
         
-        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-        // ★ ここを修正: 不足していた params_ 引数を追加 ★
-        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
         effect_chain_.setup(params_, channels_, TARGET_SAMPLE_RATE);
         
         init_portaudio();
@@ -225,7 +228,7 @@ int main(int argc, char* argv[]) {
     if (argc >= 3) {
         try { start_time = std::stod(argv[2]); } catch (const std::exception&) { std::cerr << "Invalid start time.\n"; return 1; }
     }
-    std::cout << "=== Real-Time Sound Enhancer Engine v1.6 (Final Fix) ===" << std::endl;
+    std::cout << "=== Real-Time Sound Enhancer Engine v1.7 (Multi-format support) ===" << std::endl;
     try {
         RealtimeAudioEngine engine(argv[1]);
         if (start_time > 0.0) engine.seek(start_time);
