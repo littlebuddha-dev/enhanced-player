@@ -32,6 +32,17 @@ add_executable(realtime_enhancer
     main.cpp
 )
 
+# --- ここから修正 ---
+# params.json をビルドディレクトリにコピーする設定
+add_custom_command(
+    TARGET realtime_enhancer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/params.json
+            $<TARGET_FILE_DIR:realtime_enhancer>/params.json
+    COMMENT "Copying params.json to build directory"
+)
+# --- ここまで修正 ---
+
 # インクルードディレクトリ
 # プロジェクトのルートディレクトリをインクルードパスに追加することで、
 # "advanced_dynamics.h" などローカルのヘッダーファイルを見つけられるようにします。
