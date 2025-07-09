@@ -58,7 +58,9 @@ public:
     const std::string& getName() const override { return name_; }
 
 private:
-    std::string name_ = "MSVocalInstrumentSeparator";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    std::string name_ = "ms_separator";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     double sample_rate_ = 44100.0;
     bool enabled_ = true;
     double vocal_enhance_ = 0.3, vocal_center_freq_ = 2500.0, vocal_bandwidth_ = 2000.0;
@@ -85,7 +87,6 @@ private:
         return {enhanced_left, enhanced_right};
     }
 
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     void setupEnvelopeFollowers(double sr) {
         // Attack/Releaseタイムを少し長めに設定して、よりスムーズなエンベロープを生成
         vocal_attack_coeff_ = std::exp(-1.0f / (0.01f * sr));   // 10ms
@@ -128,10 +129,8 @@ private:
         float instrument_dominance = 1.0f - vocal_dominance;
 
         // ゲインを滑らかに適用
-        // vocal_dominanceは0.0~1.0の値を取るため、これを直接ゲインに乗算することで、急峻な変化を避ける
         float mid_gain = 1.0f + vocal_enhance_ * vocal_dominance;
         float side_enhancement = (1.0f + instrument_enhance_ * instrument_dominance) * stereo_width_;
-        // ボーカルが強い時はサイドを少し抑制し、中央に寄せる
         float side_reduction = 1.0f - vocal_enhance_ * vocal_dominance * 0.3f;
 
         float enhanced_mid = mid * mid_gain;
@@ -139,8 +138,4 @@ private:
 
         return {enhanced_mid, enhanced_side};
     }
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 };
-
-// 他のクラス（DynamicMultibandSeparator, SpectralVocalSeparator）も
-// 同様に AudioEffect を継承し、ブロック処理を実装する必要がある（今回は省略）

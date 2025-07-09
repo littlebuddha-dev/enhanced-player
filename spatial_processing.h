@@ -46,7 +46,9 @@ public:
     const std::string& getName() const override { return name_; }
 
 private:
-    std::string name_ = "StereoEnhancer";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    std::string name_ = "stereo_enhancer";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     double width_ = 1.2, bass_mono_freq_ = 120.0;
     bool enabled_ = true;
     SimpleBiquad bass_lpf_l_, bass_lpf_r_, bass_hpf_l_, bass_hpf_r_;

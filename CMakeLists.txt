@@ -40,9 +40,9 @@ if(NOT FFTW3F_INCLUDE_DIR OR NOT FFTW3F_LIBRARY)
     message(FATAL_ERROR "fftw3f library not found. Please run 'brew install fftw'")
 endif()
 
-# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 # --- ビルドターゲットと全ソースファイルの定義 ---
 # すべてのソースファイルを add_executable に直接リストアップする最も確実な方法
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 add_executable(realtime_enhancer
     main.cpp
     AudioDecoderFactory.cpp
@@ -50,6 +50,7 @@ add_executable(realtime_enhancer
     SndfileDecoder.cpp
     advanced_dynamics.cpp
     advanced_eq_harmonics.cpp
+    custom_effects.cpp # 新しいソースファイルを追加
 )
 # ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 

@@ -10,6 +10,26 @@
 #include <nlohmann/json.hpp>
 #include <fftw3.h>
 
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+// パラメトリックEQ (IIRフィルタベース)
+class ParametricEQ : public AudioEffect {
+public:
+    void setup(double sr, const json& params) override;
+    void process(std::vector<float>& block, int channels) override;
+    void reset() override;
+    const std::string& getName() const override { return name_; }
+
+private:
+    std::string name_ = "parametric_eq";
+    bool enabled_ = true;
+    double sample_rate_ = 48000.0;
+    
+    // 2チャンネル分のフィルターを保持
+    std::vector<SimpleBiquad> filters_l_;
+    std::vector<SimpleBiquad> filters_r_;
+};
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+
 // 線形位相EQ（FFTベース）
 class LinearPhaseEQ : public AudioEffect {
 public:
@@ -21,7 +41,9 @@ public:
     const std::string& getName() const override { return name_; }
 
 private:
-    std::string name_ = "LinearPhaseEQ";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    std::string name_ = "linear_phase_eq";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     double sample_rate_ = 44100.0;
     size_t fft_size_ = 2048;
     size_t hop_size_ = 512;
@@ -59,7 +81,9 @@ public:
     const std::string& getName() const override { return name_; }
 
 private:
-    std::string name_ = "HarmonicEnhancer";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    std::string name_ = "harmonic_enhancer";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     double sample_rate_ = 44100.0;
     bool enabled_ = true;
     double drive_ = 0.3;
@@ -82,7 +106,9 @@ public:
     const std::string& getName() const override { return name_; }
 
 private:
-    std::string name_ = "SpectralGate";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    std::string name_ = "spectral_gate";
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     double sample_rate_ = 44100.0;
     bool enabled_ = false;
     double threshold_db_ = -60.0;
@@ -90,10 +116,8 @@ private:
     double release_ms_ = 100.0;
 
     float current_gain_ = 0.0f;
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     double attack_coeff_ = 0.0;
     double release_coeff_ = 0.0;
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
     float processSample(float sample);
 };

@@ -47,6 +47,36 @@ public:
         b0 = (1.0 + alpha * A) / a0; b1 = -2.0 * cos_w0 / a0; b2 = (1.0 - alpha * A) / a0;
         a1 = b1; a2 = (1.0 - alpha / A) / a0;
     }
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    void set_lowshelf(double sr, double freq, double q, double gain_db) {
+        reset();
+        q = std::max(0.1, q); freq = std::max(10.0, std::min(freq, sr / 2.2));
+        double A = db_to_linear(gain_db / 2.0);
+        double w0 = 2.0 * M_PI * freq / sr, cos_w0 = std::cos(w0), sin_w0 = std::sin(w0);
+        double alpha = sin_w0 / (2.0 * q);
+        double two_sqrt_A_alpha = 2.0 * sqrt(A) * alpha;
+        double a0 = (A + 1.0) + (A - 1.0) * cos_w0 + two_sqrt_A_alpha;
+        b0 = A * ((A + 1.0) - (A - 1.0) * cos_w0 + two_sqrt_A_alpha) / a0;
+        b1 = 2.0 * A * ((A - 1.0) - (A + 1.0) * cos_w0) / a0;
+        b2 = A * ((A + 1.0) - (A - 1.0) * cos_w0 - two_sqrt_A_alpha) / a0;
+        a1 = -2.0 * ((A - 1.0) + (A + 1.0) * cos_w0) / a0;
+        a2 = ((A + 1.0) + (A - 1.0) * cos_w0 - two_sqrt_A_alpha) / a0;
+    }
+    void set_highshelf(double sr, double freq, double q, double gain_db) {
+        reset();
+        q = std::max(0.1, q); freq = std::max(10.0, std::min(freq, sr / 2.2));
+        double A = db_to_linear(gain_db / 2.0);
+        double w0 = 2.0 * M_PI * freq / sr, cos_w0 = std::cos(w0), sin_w0 = std::sin(w0);
+        double alpha = sin_w0 / (2.0 * q);
+        double two_sqrt_A_alpha = 2.0 * sqrt(A) * alpha;
+        double a0 = (A + 1.0) - (A - 1.0) * cos_w0 + two_sqrt_A_alpha;
+        b0 = A * ((A + 1.0) + (A - 1.0) * cos_w0 + two_sqrt_A_alpha) / a0;
+        b1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cos_w0) / a0;
+        b2 = A * ((A + 1.0) + (A - 1.0) * cos_w0 - two_sqrt_A_alpha) / a0;
+        a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cos_w0) / a0;
+        a2 = ((A + 1.0) - (A - 1.0) * cos_w0 - two_sqrt_A_alpha) / a0;
+    }
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     
     float process(float in) {
         if (is_bypassed_ || std::isnan(in) || std::isinf(in)) return in;

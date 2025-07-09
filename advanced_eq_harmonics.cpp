@@ -6,6 +6,76 @@
 #include <stdexcept>
 #include <numeric>
 
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+// --- ParametricEQクラスのメソッド実装 ---
+void ParametricEQ::setup(double sr, const json& params) {
+    sample_rate_ = sr;
+    filters_l_.clear();
+    filters_r_.clear();
+
+    if (params.is_object() && !params.empty()) {
+        enabled_ = params.value("enabled", true);
+        if (params.contains("bands") && params["bands"].is_array()) {
+            for (const auto& band_params : params["bands"]) {
+                std::string type = band_params.value("type", "peaking");
+                double freq = band_params.value("freq", 1000.0);
+                double q = band_params.value("q", 1.0);
+                double gain_db = band_params.value("gain_db", 0.0);
+
+                SimpleBiquad filter_l, filter_r;
+                if (type == "peaking") {
+                    filter_l.set_peaking(sr, freq, q, gain_db);
+                    filter_r.set_peaking(sr, freq, q, gain_db);
+                } else if (type == "lowshelf") {
+                    filter_l.set_lowshelf(sr, freq, q, gain_db);
+                    filter_r.set_lowshelf(sr, freq, q, gain_db);
+                } else if (type == "highshelf") {
+                    filter_l.set_highshelf(sr, freq, q, gain_db);
+                    filter_r.set_highshelf(sr, freq, q, gain_db);
+                } else if (type == "hpf") {
+                    filter_l.set_hpf(sr, freq, q);
+                    filter_r.set_hpf(sr, freq, q);
+                } else if (type == "lpf") {
+                    filter_l.set_lpf(sr, freq, q);
+                    filter_r.set_lpf(sr, freq, q);
+                }
+                filters_l_.push_back(filter_l);
+                filters_r_.push_back(filter_r);
+            }
+        }
+    }
+    reset();
+}
+
+void ParametricEQ::reset() {
+    for(auto& f : filters_l_) f.reset();
+    for(auto& f : filters_r_) f.reset();
+}
+
+void ParametricEQ::process(std::vector<float>& block, int channels) {
+    if (!enabled_) return;
+
+    for (size_t i = 0; i < block.size(); i += channels) {
+        float sample_l = block[i];
+        float sample_r = (channels > 1) ? block[i+1] : sample_l;
+
+        for (auto& filter : filters_l_) {
+            sample_l = filter.process(sample_l);
+        }
+        if (channels > 1) {
+            for (auto& filter : filters_r_) {
+                sample_r = filter.process(sample_r);
+            }
+        }
+        
+        block[i] = sample_l;
+        if (channels > 1) {
+            block[i+1] = sample_r;
+        }
+    }
+}
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+
 // --- HarmonicEnhancerクラスのメソッド実装 ---
 
 void HarmonicEnhancer::setup(double sr, const json& params) {
@@ -103,7 +173,6 @@ void LinearPhaseEQ::reset() {
     std::fill(input_buffer_R_.begin(), input_buffer_R_.end(), 0.0f);
 }
 
-// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 void LinearPhaseEQ::process(std::vector<float>& block, int channels) {
     if (!enabled_ || block.empty()) return;
 
@@ -162,7 +231,6 @@ void LinearPhaseEQ::process(std::vector<float>& block, int channels) {
         frames_processed += frames_to_process_now;
     }
 }
-// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
 
 void LinearPhaseEQ::setupEQCurve(const json& bands) {
