@@ -2,17 +2,17 @@
 // アナログ風ダイナミクス処理エフェクトのクラス定義
 #pragma once
 #include "SimpleBiquad.h"
+#include "AudioEffect.h" // AudioEffect基底クラスをインクルード
 #include <vector>
 #include <cmath>
 #include <algorithm>
 #include <string>
 #include <nlohmann/json.hpp>
 
-// jsonエイリアスを追加
-using json = nlohmann::json;
+// jsonエイリアスは基底クラスヘッダで定義済み
 
 // マルチバンドコンプレッサー
-class MultibandCompressor {
+class MultibandCompressor : public AudioEffect {
 public:
     struct Band {
         double freq_low, freq_high;
@@ -25,22 +25,13 @@ public:
         SimpleBiquad lpf, hpf, bpf;
     };
     
-    void setup(double sr, const std::vector<Band>& bands);
-    float process(float input);
-
-    void reset() {
-        for (auto& band : bands_) {
-            band.envelope = 0.0;
-            band.lpf.reset();
-            band.hpf.reset();
-            band.bpf.reset();
-        }
-        for (auto& filter : crossover_filters_) {
-            filter.reset();
-        }
-    }
+    void setup(double sr, const json& params) override;
+    void process(std::vector<float>& block, int channels) override;
+    void reset() override;
+    const std::string& getName() const override { return name_; }
 
 private:
+    std::string name_ = "MultibandCompressor";
     double sample_rate_ = 44100.0;
     std::vector<Band> bands_;
     std::vector<SimpleBiquad> crossover_filters_;
@@ -52,17 +43,15 @@ private:
 };
 
 // アナログ風サチュレーション
-class AnalogSaturation {
+class AnalogSaturation : public AudioEffect {
 public:
-    // setup 関数の処理内容（{...}）を削除し、宣言（;）のみにする
-    void setup(double sr, const json& params);
-    float process(float input);
+    void setup(double sr, const json& params) override;
+    void process(std::vector<float>& block, int channels) override;
+    void reset() override;
+    const std::string& getName() const override { return name_; }
 
-    void reset() {
-        dc_blocker_.reset();
-        anti_alias_.reset();
-    }
 private:
+    std::string name_ = "AnalogSaturation";
     double sample_rate_ = 44100.0;
     double drive_ = 1.0;
     double mix_ = 0.3;
@@ -72,4 +61,6 @@ private:
     float tubeSaturation(float x);
     float tapeSaturation(float x);
     float transformerSaturation(float x);
+    // サンプル単位の処理を行う内部ヘルパー関数
+    float processSample(float sample);
 };

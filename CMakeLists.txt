@@ -1,6 +1,6 @@
-# ./CMakeLists.txt - Final Robust Version with Hybrid Library Finding
+# ./CMakeLists.txt - Simplified and Corrected with All Sources Listed
 cmake_minimum_required(VERSION 3.15)
-project(RealtimeSoundEnhancer VERSION 4.5)
+project(RealtimeSoundEnhancer VERSION 4.9)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,44 +18,40 @@ pkg_check_modules(SAMPLERATE REQUIRED samplerate)
 pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
 pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
 
-# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 # Part 2: 手動で見つけるライブラリ (macOS/Homebrew向け)
-# Homebrewのインストールプレフィックスをアーキテクチャに応じて設定
 if(APPLE)
     if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
         set(HOMEBREW_PREFIX "/opt/homebrew")
     else()
         set(HOMEBREW_PREFIX "/usr/local")
     endif()
-    # pkg-configがHomebrewのパスを見るように設定
     set(ENV{PKG_CONFIG_PATH} "${HOMEBREW_PREFIX}/lib/pkgconfig")
 endif()
 
-# 手動でmpg123を検索
 find_path(MPG123_INCLUDE_DIR mpg123.h HINTS ${HOMEBREW_PREFIX}/include)
 find_library(MPG123_LIBRARY NAMES mpg123 HINTS ${HOMEBREW_PREFIX}/lib)
 if(NOT MPG123_INCLUDE_DIR OR NOT MPG123_LIBRARY)
     message(FATAL_ERROR "mpg123 library not found. Please run 'brew install mpg123'")
 endif()
 
-# 手動でfftw3f (単精度float版) を検索
 find_path(FFTW3F_INCLUDE_DIR fftw3.h HINTS ${HOMEBREW_PREFIX}/include)
 find_library(FFTW3F_LIBRARY NAMES fftw3f HINTS ${HOMEBREW_PREFIX}/lib)
 if(NOT FFTW3F_INCLUDE_DIR OR NOT FFTW3F_LIBRARY)
     message(FATAL_ERROR "fftw3f library not found. Please run 'brew install fftw'")
 endif()
-# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
-
-# --- ビルドターゲットの定義 ---
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+# --- ビルドターゲットと全ソースファイルの定義 ---
+# すべてのソースファイルを add_executable に直接リストアップする最も確実な方法
 add_executable(realtime_enhancer
     main.cpp
+    AudioDecoderFactory.cpp
+    MPG123Decoder.cpp
+    SndfileDecoder.cpp
     advanced_dynamics.cpp
     advanced_eq_harmonics.cpp
-    SndfileDecoder.cpp
-    MPG123Decoder.cpp
-    AudioDecoderFactory.cpp
 )
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
 # --- インクルードディレクトリの指定 ---
 target_include_directories(realtime_enhancer PRIVATE
@@ -64,10 +60,8 @@ target_include_directories(realtime_enhancer PRIVATE
     ${SAMPLERATE_INCLUDE_DIRS}
     ${PORTAUDIO_INCLUDE_DIRS}
     ${NLOHMANN_JSON_INCLUDE_DIRS}
-    # ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     ${MPG123_INCLUDE_DIR}
     ${FFTW3F_INCLUDE_DIR}
-    # ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 )
 
 # --- ライブラリのリンク ---
@@ -75,10 +69,8 @@ target_link_libraries(realtime_enhancer
     ${SNDFILE_LIBRARIES}
     ${SAMPLERATE_LIBRARIES}
     ${PORTAUDIO_LIBRARIES}
-    # ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     ${MPG123_LIBRARY}
     ${FFTW3F_LIBRARY}
-    # ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 )
 
 # --- ビルド後のカスタムコマンド ---

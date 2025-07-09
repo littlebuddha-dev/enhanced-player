@@ -1,94 +1,99 @@
 // ./advanced_eq_harmonics.h
+// Header for Harmonic Enhancer and Linear Phase EQ (Final Corrected Version)
 #pragma once
 #include "SimpleBiquad.h"
+#include "AudioEffect.h"
 #include <vector>
 #include <cmath>
 #include <complex>
 #include <string>
 #include <nlohmann/json.hpp>
-
-// jsonエイリアスを追加
-using json = nlohmann::json;
+#include <fftw3.h>
 
 // 線形位相EQ（FFTベース）
-class LinearPhaseEQ {
+class LinearPhaseEQ : public AudioEffect {
 public:
-    void setup(double sr, const json& params);
-    std::vector<float> process(const std::vector<float>& input);
-
-    void reset() {
-        std::fill(input_buffer_.begin(), input_buffer_.end(), 0.0f);
-        std::fill(output_buffer_.begin(), output_buffer_.end(), 0.0f);
-        std::fill(overlap_buffer_.begin(), overlap_buffer_.end(), 0.0f);
-        buffer_pos_ = 0;
-        output_pos_ = 0;
-        samples_since_last_process_ = 0;
-    }
+    LinearPhaseEQ();
+    ~LinearPhaseEQ() override;
+    void setup(double sr, const json& params) override;
+    void process(std::vector<float>& block, int channels) override;
+    void reset() override;
+    const std::string& getName() const override { return name_; }
 
 private:
+    std::string name_ = "LinearPhaseEQ";
     double sample_rate_ = 44100.0;
     size_t fft_size_ = 2048;
-    double overlap_ = 0.75;
-    size_t hop_size_;
+    size_t hop_size_ = 512;
     bool enabled_ = true;
-    
-    std::vector<float> input_buffer_, output_buffer_, overlap_buffer_;
+    int channels_ = 0;
+
+    // 左右チャンネル用のFFTプランとバッファ
+    fftwf_plan fft_plan_fwd_L_, fft_plan_fwd_R_;
+    fftwf_plan fft_plan_bwd_L_, fft_plan_bwd_R_;
+
     std::vector<float> window_;
-    std::vector<std::complex<float>> eq_response_;
-    
-    size_t buffer_pos_ = 0;
-    size_t output_pos_ = 0;
-    size_t samples_since_last_process_ = 0;
-    
+
+    // 処理に使用するバッファ
+    std::vector<float> time_domain_buffer_L_, time_domain_buffer_R_;
+    std::vector<std::complex<float>> freq_domain_buffer_L_, freq_domain_buffer_R_;
+
+    // EQカーブ
+    std::vector<std::complex<float>> eq_curve_;
+
+    // Overlap-Add法のための入出力バッファ
+    std::vector<float> input_buffer_L_, input_buffer_R_;
+    std::vector<float> output_buffer_L_, output_buffer_R_;
+    size_t input_buffer_write_pos_ = 0;
+
     void setupEQCurve(const json& bands);
     void applyEQBand(double freq, double gain_db, double q, const std::string& type);
-    void processBlock();
 };
 
 // ハーモニックエンハンサー
-class HarmonicEnhancer {
+class HarmonicEnhancer : public AudioEffect {
 public:
-    void setup(double sr, const json& params);
-    float process(float input);
-    
-    void reset() {
-        bandpass_.reset();
-        lowpass_.reset();
-        dc_blocker_.reset();
-    }
+    void setup(double sr, const json& params) override;
+    void process(std::vector<float>& block, int channels) override;
+    void reset() override;
+    const std::string& getName() const override { return name_; }
 
 private:
+    std::string name_ = "HarmonicEnhancer";
     double sample_rate_ = 44100.0;
     bool enabled_ = true;
     double drive_ = 0.3;
     double even_harmonics_ = 0.2;
     double odd_harmonics_ = 0.3;
     double mix_ = 0.25;
-    
-    SimpleBiquad bandpass_, lowpass_, dc_blocker_;
-    
+
+    SimpleBiquad dc_blocker_, lowpass_;
+
     float generateHarmonics(float input);
+    float processSample(float sample);
 };
 
 // スペクトラルゲート（ノイズ除去）
-class SpectralGate {
+class SpectralGate : public AudioEffect {
 public:
-    void setup(double sr, const json& params);
-    float process(float input);
-    
-    void reset() {
-        current_gain_ = 0.0f;
-        attack_smoother_.reset();
-        release_smoother_.reset();
-    }
+    void setup(double sr, const json& params) override;
+    void process(std::vector<float>& block, int channels) override;
+    void reset() override;
+    const std::string& getName() const override { return name_; }
 
 private:
+    std::string name_ = "SpectralGate";
     double sample_rate_ = 44100.0;
     bool enabled_ = false;
     double threshold_db_ = -60.0;
     double attack_ms_ = 5.0;
     double release_ms_ = 100.0;
-    
+
     float current_gain_ = 0.0f;
-    SimpleBiquad attack_smoother_, release_smoother_;
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    double attack_coeff_ = 0.0;
+    double release_coeff_ = 0.0;
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+
+    float processSample(float sample);
 };
