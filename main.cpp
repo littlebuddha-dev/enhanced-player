@@ -1,4 +1,4 @@
-// ./main.cpp - Final Version with Corrected RingBuffer Implementation
+// ./main.cpp - Final Version with Corrected RingBuffer Implementation and Playback Fix
 #include <iostream>
 #include <vector>
 #include <string>
@@ -41,11 +41,9 @@ public:
         size_(frame_count * channels),
         channels_(channels) {}
     
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     bool push(const T* data, size_t frames) {
         std::lock_guard<std::mutex> lock(mutex_);
         size_t samples_to_write = frames * channels_;
-        // 内部用のサンプル数で計算する関数を呼び出す
         if (available_write_samples() < samples_to_write) return false;
         
         for (size_t i = 0; i < samples_to_write; ++i) {
@@ -58,7 +56,6 @@ public:
     size_t pop(T* data, size_t frames) {
         std::lock_guard<std::mutex> lock(mutex_);
         size_t samples_to_read = frames * channels_;
-        // 内部用のサンプル数で計算する関数を呼び出す
         size_t available = available_read_samples();
         size_t to_read = std::min(samples_to_read, available);
         
@@ -76,12 +73,9 @@ public:
     size_t available_write_frames() const {
         return available_write_samples() / channels_;
     }
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
     void clear() { std::lock_guard<std::mutex> lock(mutex_); read_pos_ = write_pos_ = 0; }
 private:
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
-    // 内部での計算用に、サンプル単位で空き容量を返すヘルパー関数を追加
     size_t available_read_samples() const {
         if (write_pos_ >= read_pos_) {
             return write_pos_ - read_pos_;
@@ -90,10 +84,8 @@ private:
         }
     }
     size_t available_write_samples() const {
-        // -1はread/writeポインタの衝突（空と満杯の区別がつかなくなる）を避けるため
         return size_ - available_read_samples() - 1;
     }
-    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
     std::vector<T> buffer_;
     size_t size_;
@@ -175,7 +167,27 @@ public:
         if (resampler_state_) { src_delete(resampler_state_); }
         Pa_Terminate();
     }
-    void play() { std::lock_guard<std::mutex> lock(state_mutex_); if (playback_state_ != PlaybackState::PLAYING) { if (playback_state_ == PlaybackState::FINISHED) { seek_to_frame(0); } playback_state_ = PlaybackState::PLAYING; loading_cv_.notify_all(); if (Pa_IsStreamActive(stream_) == 0) { PaError err = Pa_StartStream(stream_); if (err != paNoError) { std::cerr << "Failed to start audio stream: " << Pa_GetErrorText(err) << std::endl; playback_state_ = PlaybackState::STOPPED; return; } } std::cout << "Playback started." << std::endl; } }
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    void play() { 
+        std::lock_guard<std::mutex> lock(state_mutex_); 
+        if (playback_state_ != PlaybackState::PLAYING) { 
+            if (playback_state_ == PlaybackState::FINISHED) { 
+                seek_to_frame(0); 
+            } 
+            playback_state_ = PlaybackState::PLAYING; 
+            loading_cv_.notify_all(); 
+            if (Pa_IsStreamActive(stream_) == 0) { 
+                PaError err = Pa_StartStream(stream_); 
+                if (err != paNoError) { 
+                    std::cerr << "Failed to start audio stream: " << Pa_GetErrorText(err) << std::endl; 
+                    playback_state_ = PlaybackState::STOPPED; 
+                    return; 
+                } 
+            } 
+            std::cout << "Playback started." << std::endl; 
+        } 
+    }
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     void pause() { std::lock_guard<std::mutex> lock(state_mutex_); if (playback_state_ == PlaybackState::PLAYING) { playback_state_ = PlaybackState::PAUSED; std::cout << "Playback paused." << std::endl; } }
     void stop() { { std::lock_guard<std::mutex> lock(state_mutex_); if (playback_state_ != PlaybackState::STOPPED) { playback_state_ = PlaybackState::STOPPED; std::cout << "Playback stopped." << std::endl; } } if (stream_ && Pa_IsStreamActive(stream_) == 1) { Pa_StopStream(stream_); } ring_buffer_->clear(); seek_to_frame(0); }
     void seek(double seconds) { long long target_frame = static_cast<long long>(seconds * source_sample_rate_); target_frame = std::max((long long)0, std::min(target_frame, total_frames_ - 1)); seek_to_frame(target_frame); std::cout << "Seek to " << seconds << " seconds." << std::endl; }
@@ -197,34 +209,48 @@ private:
     double resampling_ratio_ = 1.0;
     std::thread loading_thread_;
     std::atomic<bool> should_exit_{false};
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    std::atomic<bool> end_of_input_{false};
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     std::condition_variable loading_cv_;
     std::mutex loading_mutex_;
     
     void init_portaudio() { PaError err = Pa_Initialize(); if (err != paNoError) { throw std::runtime_error(std::string("PortAudio init failed: ") + Pa_GetErrorText(err)); } PaStreamParameters output_parameters; output_parameters.device = Pa_GetDefaultOutputDevice(); if (output_parameters.device == paNoDevice) { throw std::runtime_error("No default audio output device found."); } const PaDeviceInfo* device_info = Pa_GetDeviceInfo(output_parameters.device); if (!device_info) { throw std::runtime_error("Failed to get device info"); } output_parameters.channelCount = channels_; output_parameters.sampleFormat = paFloat32; output_parameters.suggestedLatency = device_info->defaultLowOutputLatency; output_parameters.hostApiSpecificStreamInfo = nullptr; err = Pa_OpenStream(&stream_, nullptr, &output_parameters, TARGET_SAMPLE_RATE, paFramesPerBufferUnspecified, paClipOff, audioCallback, this); if (err != paNoError) { throw std::runtime_error(std::string("Failed to open audio stream: ") + Pa_GetErrorText(err)); } }
-    void seek_to_frame(long long frame) { decoder_->seek(frame); ring_buffer_->clear(); if (resampler_state_) { src_reset(resampler_state_); } effect_chain_.reset(); { std::lock_guard<std::mutex> lock(state_mutex_); if(playback_state_ == PlaybackState::FINISHED) playback_state_ = PlaybackState::PAUSED; } }
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    void seek_to_frame(long long frame) { 
+        decoder_->seek(frame); 
+        ring_buffer_->clear(); 
+        if (resampler_state_) { src_reset(resampler_state_); } 
+        effect_chain_.reset(); 
+        end_of_input_ = false;
+        { 
+            std::lock_guard<std::mutex> lock(state_mutex_); 
+            if(playback_state_ == PlaybackState::FINISHED) playback_state_ = PlaybackState::PAUSED; 
+        }
+        loading_cv_.notify_all();
+    }
     
     void loading_thread_func() {
         std::vector<float> read_buffer(FRAMES_PER_BUFFER * channels_);
         std::vector<float> resampled_buffer(static_cast<size_t>(FRAMES_PER_BUFFER * channels_ * resampling_ratio_ * 2.0));
-        bool end_of_input = false;
 
         while (!should_exit_) {
             {
                 std::unique_lock<std::mutex> lock(loading_mutex_);
-                loading_cv_.wait(lock, [this, &end_of_input] {
-                    return should_exit_ || (playback_state_ == PlaybackState::PLAYING && ring_buffer_->available_write_frames() >= FRAMES_PER_BUFFER && !end_of_input);
+                loading_cv_.wait(lock, [this] {
+                    return should_exit_ || (playback_state_ == PlaybackState::PLAYING && ring_buffer_->available_write_frames() >= FRAMES_PER_BUFFER && !end_of_input_);
                 });
             }
 
             if (should_exit_) break;
-            if (playback_state_ != PlaybackState::PLAYING || end_of_input) {
+            if (playback_state_ != PlaybackState::PLAYING || end_of_input_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
 
             size_t frames_read = decoder_->read(read_buffer.data(), FRAMES_PER_BUFFER);
             if (frames_read == 0) {
-                end_of_input = true;
+                end_of_input_ = true;
                 continue;
             }
 
@@ -243,6 +269,7 @@ private:
             }
         }
     }
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
     int processAudio(float* output_buffer, unsigned long frames_per_buffer) {
         if (playback_state_ == PlaybackState::PAUSED || playback_state_ == PlaybackState::STOPPED) {
@@ -254,11 +281,16 @@ private:
 
         if (frames_read < frames_per_buffer) {
             std::fill(output_buffer + (frames_read * channels_), output_buffer + (frames_per_buffer * channels_), 0.0f);
-            if (ring_buffer_->available_read_frames() == 0) {
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+            if (end_of_input_ && ring_buffer_->available_read_frames() == 0) {
                  std::lock_guard<std::mutex> lock(state_mutex_);
-                 playback_state_ = PlaybackState::FINISHED;
+                 if (playback_state_ == PlaybackState::PLAYING) {
+                    playback_state_ = PlaybackState::FINISHED;
+                    std::cout << "Playback finished." << std::endl;
+                 }
             }
         }
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
         if(frames_read > 0) {
             std::vector<float> processing_vec(output_buffer, output_buffer + (frames_read * channels_));
@@ -284,7 +316,7 @@ int main(int argc, char* argv[]) {
     if (argc < 2) { std::cerr << "Usage: " << argv[0] << " <input_audio_file> [start_seconds]" << std::endl; return 1; }
     double start_time = 0.0;
     if (argc >= 3) { try { start_time = std::stod(argv[2]); } catch (const std::exception&) { std::cerr << "Invalid start time: " << argv[2] << std::endl; return 1; } }
-    std::cout << "=== Real-Time Sound Enhancer Engine v4.4 (Final Corrected) ===" << std::endl;
+    std::cout << "=== Real-Time Sound Enhancer Engine v4.5 (Playback Fix) ===" << std::endl;
     try {
         RealtimeAudioEngine engine(argv[1], argv[0]);
         if (start_time > 0.0) { engine.seek(start_time); }
