@@ -1,4 +1,4 @@
-// ./main.cpp - 安定性・堅牢性向上版リアルタイム再生エンジン v2.2
+// ./main.cpp - アナログ質感向上版リアルタイム再生エンジン v2.3
 #include <iostream>
 #include <vector>
 #include <string>
@@ -140,32 +140,65 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         channels_ = channels;
         separator_.setup(sr, params.value("separation", json({})));
+        saturation_.setup(sr, params.value("analog_saturation", json({})));
+        enhancer_.setup(sr, params.value("harmonic_enhancer", json({})));
         std::cout << "Effect Chain Initialized for " << channels << " channels at " << sr << " Hz." << std::endl;
+        std::cout << " -> Analog Saturation and Harmonic Enhancer are now active." << std::endl;
     }
     
     void process(std::vector<float>& buffer) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (buffer.empty() || channels_ != 2) return;
-        
+        if (buffer.empty()) return;
+
         size_t frame_count = buffer.size() / channels_;
         for (size_t i = 0; i < frame_count; ++i) {
             float* frame = &buffer[i * channels_];
-            auto separated = separator_.process(frame[0], frame[1]);
-            frame[0] = separated.first;
-            frame[1] = separated.second;
+            
+            // チャンネルが2（ステレオ）の場合
+            if (channels_ == 2) {
+                // 1. ボーカル・楽器分離
+                auto separated = separator_.process(frame[0], frame[1]);
+                float left = separated.first;
+                float right = separated.second;
+
+                // 2. ハーモニックエンハンサー（モノラル信号に適用後、ステレオ化）
+                float mid = (left + right) * 0.5f;
+                float side = (left - right) * 0.5f;
+                float enhanced_mid = enhancer_.process(mid);
+                
+                left = enhanced_mid + side;
+                right = enhanced_mid - side;
+
+                // 3. アナログサチュレーション（各チャンネルに適用）
+                frame[0] = saturation_.process(left);
+                frame[1] = saturation_.process(right);
+
+            } else { // モノラルなど他のチャンネル構成の場合
+                for(int ch = 0; ch < channels_; ++ch) {
+                    float sample = frame[ch];
+                    sample = enhancer_.process(sample);
+                    sample = saturation_.process(sample);
+                    frame[ch] = sample;
+                }
+            }
         }
     }
     
     void reset() {
         std::lock_guard<std::mutex> lock(mutex_);
         separator_.reset();
+        saturation_.reset();
+        enhancer_.reset();
     }
     
 private:
     int channels_ = 0;
     MSVocalInstrumentSeparator separator_;
+    AnalogSaturation saturation_;
+    HarmonicEnhancer enhancer_;
     mutable std::mutex mutex_;
 };
+
 
 // --- 改良版リアルタイムオーディオエンジン ---
 class RealtimeAudioEngine {
@@ -487,7 +520,7 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    std::cout << "=== Real-Time Sound Enhancer Engine v2.2 (Robust Path Handling) ===" << std::endl;
+    std::cout << "=== Real-Time Sound Enhancer Engine v2.3 (Warmth Enhanced) ===" << std::endl;
     
     try {
         RealtimeAudioEngine engine(argv[1], argv[0]);
