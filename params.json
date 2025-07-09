@@ -83,7 +83,7 @@
   "analog_saturation": {
     "enabled": true,
     "drive": 1.5,
-    "mix": 0.3,
+    "mix": 0.6,
     "type": "tube",
     "description": "Warm tube-like saturation"
   },
@@ -92,7 +92,7 @@
     "drive": 0.4,
     "even_harmonics": 0.4,
     "odd_harmonics": 0.15,
-    "mix": 0.2,
+    "mix": 0.6,
     "description": "Add warmth with even harmonics"
   },
   "noise_control": {

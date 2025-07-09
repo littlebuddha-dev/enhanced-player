@@ -1,80 +1,93 @@
 # ./CMakeLists.txt
+# CMakeLists.txt - Final Robust Version
 cmake_minimum_required(VERSION 3.15)
-project(RealtimeSoundEnhancer VERSION 2.0)
+project(RealtimeSoundEnhancer VERSION 4.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# コンパイラ最適化フラグ
-# nlohmann/jsonで警告が出るため -ffast-math は削除
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native")
 endif()
 
-# 依存ライブラリを探す
+# --- 依存関係の検索 ---
 find_package(PkgConfig REQUIRED)
 
-# libsndfile
+# libsndfile, samplerate, portaudio, nlohmann_json は pkg-config で探す
 pkg_check_modules(SNDFILE REQUIRED sndfile)
-
-# libsamplerate
 pkg_check_modules(SAMPLERATE REQUIRED samplerate)
-
-# PortAudio
 pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
-
-# nlohmann/json
-# pkg-config を使って nlohmann_json のパスを見つける
 pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
 
-# 実行ファイル作成
+# --- mpg123 を手動で、かつ確実に見つける ---
+if(APPLE)
+    # Homebrewのパスをアーキテクチャに応じて設定
+    if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
+        set(HOMEBREW_PREFIX "/opt/homebrew")
+    else()
+        set(HOMEBREW_PREFIX "/usr/local")
+    endif()
+
+    # ヘッダーファイルの場所を探す
+    find_path(MPG123_INCLUDE_DIR mpg123.h
+        HINTS ${HOMEBREW_PREFIX}/include
+        PATH_SUFFIXES mpg123
+    )
+    # ライブラリファイルの場所を探す
+    find_library(MPG123_LIBRARY NAMES mpg123
+        HINTS ${HOMEBREW_PREFIX}/lib
+    )
+
+    if(NOT MPG123_INCLUDE_DIR OR NOT MPG123_LIBRARY)
+        message(FATAL_ERROR "mpg123 library not found in Homebrew paths. Please ensure 'brew install mpg123' was successful.")
+    endif()
+    
+    # 見つけたパスを変数に設定
+    set(MPG123_INCLUDE_DIRS ${MPG123_INCLUDE_DIR})
+    set(MPG123_LIBRARIES ${MPG123_LIBRARY})
+    message(STATUS "Found mpg123 headers: ${MPG123_INCLUDE_DIR}")
+    message(STATUS "Found mpg123 library: ${MPG123_LIBRARY}")
+
+else()
+    # macOS以外では引き続きpkg-configを利用
+    pkg_check_modules(MPG123 REQUIRED mpg123)
+endif()
+# --- ここまで修正 ---
+
+
+# --- ビルドターゲットの定義 ---
 add_executable(realtime_enhancer
     main.cpp
-    # --- ここから修正 ---
     advanced_dynamics.cpp
     advanced_eq_harmonics.cpp
-    # --- ここまで修正 ---
+    SndfileDecoder.cpp
+    MPG123Decoder.cpp
+    AudioDecoderFactory.cpp
 )
 
-# params.json をビルドディレクトリにコピーする設定
-add_custom_command(
-    TARGET realtime_enhancer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_SOURCE_DIR}/params.json
-            $<TARGET_FILE_DIR:realtime_enhancer>/params.json
-    COMMENT "Copying params.json to build directory"
-)
-
-# インクルードディレクトリ
-# プロジェクトのルートディレクトリをインクルードパスに追加することで、
-# "advanced_dynamics.h" などをローカルのヘッダーファイルを見つけられるようにします。
+# --- リンクとインクルード ---
 target_include_directories(realtime_enhancer PRIVATE
     ${PROJECT_SOURCE_DIR}
     ${SNDFILE_INCLUDE_DIRS}
     ${SAMPLERATE_INCLUDE_DIRS}
     ${PORTAUDIO_INCLUDE_DIRS}
     ${NLOHMANN_JSON_INCLUDE_DIRS}
+    ${MPG123_INCLUDE_DIRS} # ここで上で見つけたパスが使われる
 )
 
-# ライブラリリンク
 target_link_libraries(realtime_enhancer
     ${SNDFILE_LIBRARIES}
     ${SAMPLERATE_LIBRARIES}
     ${PORTAUDIO_LIBRARIES}
+    ${NLOHMANN_JSON_LIBRARIES}
+    ${MPG123_LIBRARIES} # ここで上で見つけたパスが使われる
 )
 
-# コンパイルフラグ
-target_compile_options(realtime_enhancer PRIVATE
-    ${SNDFILE_CFLAGS_OTHER}
-    ${SAMPLERATE_CFLAGS_OTHER}
-    ${PORTAUDIO_CFLAGS_OTHER}
-)
-
-# インストール設定
-install(TARGETS realtime_enhancer DESTINATION bin)
-
-# サンプル設定ファイルのインストール
-install(FILES
-    params.json
-    DESTINATION share/realtime_enhancer
+# --- ビルド後のコマンド ---
+add_custom_command(
+    TARGET realtime_enhancer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/params.json
+            $<TARGET_FILE_DIR:realtime_enhancer>/params.json
+    COMMENT "Copying params.json to build directory"
 )

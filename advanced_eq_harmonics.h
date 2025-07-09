@@ -1,72 +1,94 @@
-// ./advanced_eq_harmonics.cpp
-#include "advanced_eq_harmonics.h"
+// ./advanced_eq_harmonics.h
+#pragma once
+#include "SimpleBiquad.h"
+#include <vector>
 #include <cmath>
-#include <algorithm>
+#include <complex>
+#include <string>
+#include <nlohmann/json.hpp>
 
-// HarmonicEnhancerクラスのメソッド実装
-void HarmonicEnhancer::setup(double sr, const json& params) {
-    sample_rate_ = sr;
-    if (params.is_object() && !params.empty()) {
-        enabled_ = params.value("enabled", true);
-        drive_ = params.value("drive", 0.3);
-        even_harmonics_ = params.value("even_harmonics", 0.2);
-        odd_harmonics_ = params.value("odd_harmonics", 0.3);
-        mix_ = params.value("mix", 0.25);
-    }
-    
-    // DC成分を除去するためのハイパスフィルタ
-    dc_blocker_.set_hpf(sr, 15.0, 0.707);
-    // 倍音生成によって発生するエイリアシングを抑制するためのローパスフィルタ
-    lowpass_.set_lpf(sr, sr / 2.2, 0.707);
-}
+// jsonエイリアスを追加
+using json = nlohmann::json;
 
-float HarmonicEnhancer::generateHarmonics(float input) {
-    float processed = 0.0f;
-    float abs_input = std::fabs(input);
+// 線形位相EQ（FFTベース）
+class LinearPhaseEQ {
+public:
+    void setup(double sr, const json& params);
+    std::vector<float> process(const std::vector<float>& input);
 
-    // 偶数次倍音: 絶対値や二乗関数で生成
-    if (even_harmonics_ > 0) {
-        processed += (input * input - abs_input) * even_harmonics_;
+    void reset() {
+        std::fill(input_buffer_.begin(), input_buffer_.end(), 0.0f);
+        std::fill(output_buffer_.begin(), output_buffer_.end(), 0.0f);
+        std::fill(overlap_buffer_.begin(), overlap_buffer_.end(), 0.0f);
+        buffer_pos_ = 0;
+        output_pos_ = 0;
+        samples_since_last_process_ = 0;
     }
 
-    // 奇数次倍音: tanh関数や三次関数で生成
-    if (odd_harmonics_ > 0) {
-        processed += (std::tanh(input * 1.5f) - input) * odd_harmonics_;
+private:
+    double sample_rate_ = 44100.0;
+    size_t fft_size_ = 2048;
+    double overlap_ = 0.75;
+    size_t hop_size_;
+    bool enabled_ = true;
+    
+    std::vector<float> input_buffer_, output_buffer_, overlap_buffer_;
+    std::vector<float> window_;
+    std::vector<std::complex<float>> eq_response_;
+    
+    size_t buffer_pos_ = 0;
+    size_t output_pos_ = 0;
+    size_t samples_since_last_process_ = 0;
+    
+    void setupEQCurve(const json& bands);
+    void applyEQBand(double freq, double gain_db, double q, const std::string& type);
+    void processBlock();
+};
+
+// ハーモニックエンハンサー
+class HarmonicEnhancer {
+public:
+    void setup(double sr, const json& params);
+    float process(float input);
+    
+    void reset() {
+        bandpass_.reset();
+        lowpass_.reset();
+        dc_blocker_.reset();
     }
+
+private:
+    double sample_rate_ = 44100.0;
+    bool enabled_ = true;
+    double drive_ = 0.3;
+    double even_harmonics_ = 0.2;
+    double odd_harmonics_ = 0.3;
+    double mix_ = 0.25;
     
-    return input + processed * drive_;
-}
-
-float HarmonicEnhancer::process(float input) {
-    if (!enabled_) return input;
-
-    float dry_signal = input;
+    SimpleBiquad bandpass_, lowpass_, dc_blocker_;
     
-    input = dc_blocker_.process(input);
-    float wet_signal = generateHarmonics(input);
-    wet_signal = lowpass_.process(wet_signal);
+    float generateHarmonics(float input);
+};
+
+// スペクトラルゲート（ノイズ除去）
+class SpectralGate {
+public:
+    void setup(double sr, const json& params);
+    float process(float input);
     
-    return (1.0 - mix_) * dry_signal + mix_ * wet_signal;
-}
+    void reset() {
+        current_gain_ = 0.0f;
+        attack_smoother_.reset();
+        release_smoother_.reset();
+    }
 
-
-// LinearPhaseEQ, SpectralGate のスタブ実装 (将来的な拡張用)
-void LinearPhaseEQ::setup(double sr, const json& params) {
-    sample_rate_ = sr;
-    // 実装
-}
-
-std::vector<float> LinearPhaseEQ::process(const std::vector<float>& input) {
-    // 実装
-    return input;
-}
-
-void SpectralGate::setup(double sr, const json& params) {
-    sample_rate_ = sr;
-    // 実装
-}
-
-float SpectralGate::process(float input) {
-    // 実装
-    return input;
-}
+private:
+    double sample_rate_ = 44100.0;
+    bool enabled_ = false;
+    double threshold_db_ = -60.0;
+    double attack_ms_ = 5.0;
+    double release_ms_ = 100.0;
+    
+    float current_gain_ = 0.0f;
+    SimpleBiquad attack_smoother_, release_smoother_;
+};

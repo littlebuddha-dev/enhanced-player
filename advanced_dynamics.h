@@ -1,55 +1,75 @@
-// ./advanced_dynamics.cpp
-#include "advanced_dynamics.h"
+// ./advanced_dynamics.h
+// アナログ風ダイナミクス処理エフェクトのクラス定義
+#pragma once
+#include "SimpleBiquad.h"
+#include <vector>
 #include <cmath>
+#include <algorithm>
+#include <string>
+#include <nlohmann/json.hpp>
 
-// AnalogSaturationクラスのメソッド実装
-float AnalogSaturation::tubeSaturation(float x) {
-    if (drive_ == 0.0) return x;
-    float k = 2.0 * drive_;
-    return (x + k * x) / (1.0 + k * std::abs(x));
-}
+// jsonエイリアスを追加
+using json = nlohmann::json;
 
-float AnalogSaturation::tapeSaturation(float x) {
-    if (drive_ == 0.0) return x;
-    return std::tanh(drive_ * x);
-}
-
-float AnalogSaturation::transformerSaturation(float x) {
-    if (drive_ == 0.0) return x;
-    const float a = 0.8f; 
-    const float b = 1.5f;
-    float x_driven = drive_ * x;
-    return std::tanh(x_driven) + a * std::tanh(b * x_driven);
-}
-
-float AnalogSaturation::process(float input) {
-    float dry_signal = input;
-    input = dc_blocker_.process(input);
-
-    float wet_signal;
-    if (type_ == "tube") {
-        wet_signal = tubeSaturation(input);
-    } else if (type_ == "tape") {
-        wet_signal = tapeSaturation(input);
-    } else if (type_ == "transformer") {
-        wet_signal = transformerSaturation(input);
-    } else {
-        wet_signal = input;
-    }
+// マルチバンドコンプレッサー
+class MultibandCompressor {
+public:
+    struct Band {
+        double freq_low, freq_high;
+        double threshold_db, ratio, attack_ms, release_ms;
+        double makeup_gain_db;
+        bool enabled;
+        double envelope = 0.0;
+        double attack_coeff = 0.0;
+        double release_coeff = 0.0;
+        SimpleBiquad lpf, hpf, bpf;
+    };
     
-    wet_signal = anti_alias_.process(wet_signal);
+    void setup(double sr, const std::vector<Band>& bands);
+    float process(float input);
 
-    return (1.0 - mix_) * dry_signal + mix_ * wet_signal;
-}
+    void reset() {
+        for (auto& band : bands_) {
+            band.envelope = 0.0;
+            band.lpf.reset();
+            band.hpf.reset();
+            band.bpf.reset();
+        }
+        for (auto& filter : crossover_filters_) {
+            filter.reset();
+        }
+    }
 
-// MultibandCompressor のスタブ実装 (将来的な拡張用)
-void MultibandCompressor::setup(double sr, const std::vector<Band>& bands) {
-    sample_rate_ = sr;
-    bands_ = bands;
-    // setupCrossoverNetwork(); // 必要に応じて実装
-}
+private:
+    double sample_rate_ = 44100.0;
+    std::vector<Band> bands_;
+    std::vector<SimpleBiquad> crossover_filters_;
+    
+    void setupCrossoverNetwork();
+    std::vector<float> splitToBands(float input);
+    float compressBand(float input, Band& band);
+    float sumBands(const std::vector<float>& bands);
+};
 
-float MultibandCompressor::process(float input) {
-    // マルチバンドコンプレッサーの処理ロジックをここに実装
-    return input; 
-}
+// アナログ風サチュレーション
+class AnalogSaturation {
+public:
+    // setup 関数の処理内容（{...}）を削除し、宣言（;）のみにする
+    void setup(double sr, const json& params);
+    float process(float input);
+
+    void reset() {
+        dc_blocker_.reset();
+        anti_alias_.reset();
+    }
+private:
+    double sample_rate_ = 44100.0;
+    double drive_ = 1.0;
+    double mix_ = 0.3;
+    std::string type_ = "tube";
+    SimpleBiquad dc_blocker_, anti_alias_;
+    
+    float tubeSaturation(float x);
+    float tapeSaturation(float x);
+    float transformerSaturation(float x);
+};
