@@ -19,6 +19,9 @@ pkg_check_modules(SAMPLERATE REQUIRED samplerate)
 pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
 pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
 
+# FFTWを追加
+find_package(FFTW3 REQUIRED)
+
 # --- mpg123 を手動で、かつ確実に見つける ---
 if(APPLE)
     # Homebrewのパスをアーキテクチャに応じて設定
@@ -72,7 +75,8 @@ target_include_directories(realtime_enhancer PRIVATE
     ${SAMPLERATE_INCLUDE_DIRS}
     ${PORTAUDIO_INCLUDE_DIRS}
     ${NLOHMANN_JSON_INCLUDE_DIRS}
-    ${MPG123_INCLUDE_DIRS} # ここで上で見つけたパスが使われる
+    ${MPG123_INCLUDE_DIRS}
+    ${FFTW3_INCLUDE_DIRS}
 )
 
 target_link_libraries(realtime_enhancer
@@ -80,7 +84,8 @@ target_link_libraries(realtime_enhancer
     ${SAMPLERATE_LIBRARIES}
     ${PORTAUDIO_LIBRARIES}
     ${NLOHMANN_JSON_LIBRARIES}
-    ${MPG123_LIBRARIES} # ここで上で見つけたパスが使われる
+    ${MPG123_LIBRARIES}
+    ${FFTW3_LIBRARIES}
 )
 
 # --- ビルド後のコマンド ---
