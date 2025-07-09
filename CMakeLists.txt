@@ -1,7 +1,6 @@
-# ./CMakeLists.txt
-# CMakeLists.txt - Final Robust Version
+# ./CMakeLists.txt - Final Robust Version with FFTW fix
 cmake_minimum_required(VERSION 3.15)
-project(RealtimeSoundEnhancer VERSION 4.1)
+project(RealtimeSoundEnhancer VERSION 4.2)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,8 +18,10 @@ pkg_check_modules(SAMPLERATE REQUIRED samplerate)
 pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
 pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
 
-# FFTWを追加
-find_package(FFTW3 REQUIRED)
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+# FFTW: 単精度(float)コンポーネントを必須として検索
+find_package(FFTW3 COMPONENTS float REQUIRED)
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
 # --- mpg123 を手動で、かつ確実に見つける ---
 if(APPLE)
@@ -55,7 +56,6 @@ else()
     # macOS以外では引き続きpkg-configを利用
     pkg_check_modules(MPG123 REQUIRED mpg123)
 endif()
-# --- ここまで修正 ---
 
 
 # --- ビルドターゲットの定義 ---
@@ -76,7 +76,9 @@ target_include_directories(realtime_enhancer PRIVATE
     ${PORTAUDIO_INCLUDE_DIRS}
     ${NLOHMANN_JSON_INCLUDE_DIRS}
     ${MPG123_INCLUDE_DIRS}
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     ${FFTW3_INCLUDE_DIRS}
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 )
 
 target_link_libraries(realtime_enhancer
@@ -85,7 +87,9 @@ target_link_libraries(realtime_enhancer
     ${PORTAUDIO_LIBRARIES}
     ${NLOHMANN_JSON_LIBRARIES}
     ${MPG123_LIBRARIES}
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     ${FFTW3_LIBRARIES}
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 )
 
 # --- ビルド後のコマンド ---
