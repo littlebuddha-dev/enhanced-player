@@ -30,9 +30,12 @@ pkg_check_modules(NLOHMANN_JSON REQUIRED nlohmann_json)
 # 実行ファイル作成
 add_executable(realtime_enhancer
     main.cpp
+    # --- ここから修正 ---
+    advanced_dynamics.cpp
+    advanced_eq_harmonics.cpp
+    # --- ここまで修正 ---
 )
 
-# --- ここから修正 ---
 # params.json をビルドディレクトリにコピーする設定
 add_custom_command(
     TARGET realtime_enhancer POST_BUILD
@@ -41,11 +44,10 @@ add_custom_command(
             $<TARGET_FILE_DIR:realtime_enhancer>/params.json
     COMMENT "Copying params.json to build directory"
 )
-# --- ここまで修正 ---
 
 # インクルードディレクトリ
 # プロジェクトのルートディレクトリをインクルードパスに追加することで、
-# "advanced_dynamics.h" などローカルのヘッダーファイルを見つけられるようにします。
+# "advanced_dynamics.h" などをローカルのヘッダーファイルを見つけられるようにします。
 target_include_directories(realtime_enhancer PRIVATE
     ${PROJECT_SOURCE_DIR}
     ${SNDFILE_INCLUDE_DIRS}
