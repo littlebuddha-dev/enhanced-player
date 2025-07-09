@@ -52,7 +52,18 @@ private:
 // アナログ風サチュレーション
 class AnalogSaturation {
 public:
-    void setup(double sr, const json& params);
+    //◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    void setup(double sr, const json& params) {
+        sample_rate_ = sr;
+        if (params.is_object() && !params.empty()) {
+            drive_ = params.value("drive", 1.0);
+            mix_ = params.value("mix", 0.3);
+            type_ = params.value("type", "tube");
+        }
+        dc_blocker_.set_hpf(sr, 15.0, 0.707);
+        anti_alias_.set_lpf(sr, sr / 2.1, 0.707);
+    }
+    //◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     float process(float input);
 
     void reset() {
