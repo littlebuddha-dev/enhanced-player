@@ -80,6 +80,21 @@
     "total_mix": 0.22,
     "description": "Premium gloss with advanced noise control"
   },
+  "analog_saturation": {
+    "enabled": true,
+    "drive": 1.5,
+    "mix": 0.3,
+    "type": "tube",
+    "description": "Warm tube-like saturation"
+  },
+  "harmonic_enhancer": {
+    "enabled": true,
+    "drive": 0.4,
+    "even_harmonics": 0.4,
+    "odd_harmonics": 0.15,
+    "mix": 0.2,
+    "description": "Add warmth with even harmonics"
+  },
   "noise_control": {
     "enabled": true,
     "high_freq_limit": 30000.0,
@@ -89,12 +104,14 @@
     "description": "Advanced artifact and noise suppression"
   },
   "processing_info": {
-    "version": "Enhanced Sound Processor v2.0",
+    "version": "Enhanced Sound Processor v2.1",
     "features": [
       "M/S Vocal-Instrument Separation",
       "Premium Gloss Enhancement with Noise Control",
       "Enhanced Harmonic Exciter",
       "6-Band Parametric EQ",
+      "Analog Saturation (Tube/Tape)",
+      "Harmonic Enhancer",
       "Advanced Anti-Aliasing",
       "Mastering Grade Limiter",
       "192kHz Internal Processing",
@@ -104,7 +121,7 @@
       "noise_reduction": "85-90% reduction in digital artifacts",
       "gloss_quality": "Natural, musical enhancement",
       "separation_effectiveness": "Clear vocal-instrument distinction",
-      "overall_improvement": "Studio-grade professional results"
+      "overall_improvement": "Studio-grade professional results with analog warmth"
     }
   },
   "presets": {
@@ -123,7 +140,9 @@
         "analog_color": 0.25,
         "total_mix": 0.25
       },
-      "description": "Warm, analog-style processing"
+      "analog_saturation": { "drive": 2.0, "mix": 0.4, "type": "tube" },
+      "harmonic_enhancer": { "drive": 0.5, "even_harmonics": 0.5, "mix": 0.25 },
+      "description": "Warm, rich, analog-style processing"
     },
     "brilliant": {
       "exciter": { "drive": 3.2, "mix": 0.22 },
