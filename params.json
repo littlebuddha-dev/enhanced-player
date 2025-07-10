@@ -3,11 +3,13 @@
     "analog_saturation",
     "harmonic_enhancer",
     "parametric_eq",
+    "spectral_gate",        // Added spectral_gate to the chain
     "linear_phase_eq",
     "ms_separator",
     "exciter",
     "gloss_enhancer",
     "stereo_enhancer",
+    "multiband_compressor",
     "mastering_limiter"
   ],
   "analog_saturation": {
@@ -37,7 +39,7 @@
     ]
   },
   "linear_phase_eq": {
-    "enabled": false, 
+    "enabled": false,
     "fft_size": 2048,
     "bands": [
       { "type": "peaking", "freq": 500.0, "q": 1.0, "gain_db": -2.0 }
@@ -66,6 +68,20 @@
       "enabled": true,
       "width": 1.15,
       "bass_mono_freq": 150.0
+  },
+  "multiband_compressor": {
+    "enabled": true,
+    "bands": [
+      { "freq_low": 20.0, "freq_high": 250.0, "threshold_db": -12.0, "ratio": 1.8, "attack_ms": 15.0, "release_ms": 80.0, "makeup_gain_db": 1.0, "enabled": true },
+      { "freq_low": 250.0, "freq_high": 2500.0, "threshold_db": -10.0, "ratio": 2.5, "attack_ms": 8.0, "release_ms": 120.0, "makeup_gain_db": 0.5, "enabled": true },
+      { "freq_low": 2500.0, "freq_high": 20000.0, "threshold_db": -15.0, "ratio": 3.0, "attack_ms": 5.0, "release_ms": 150.0, "makeup_gain_db": 1.5, "enabled": true }
+    ]
+  },
+  "spectral_gate": {           // Added spectral_gate configuration
+    "enabled": true,
+    "threshold_db": -50.0,    // Default threshold for noise reduction
+    "attack_ms": 3.0,
+    "release_ms": 100.0
   },
   "mastering_limiter": {
       "enabled": true,

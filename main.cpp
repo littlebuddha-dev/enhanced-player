@@ -20,9 +20,7 @@
 #include <portaudio.h>
 #include <nlohmann/json.hpp>
 
-// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 #include "AudioDecoderFactory.h"
-// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 #include "AudioEffectFactory.h"
 #include "vocal_instrument_separator.h"
 #include "advanced_dynamics.h"
@@ -33,7 +31,7 @@
 using json = nlohmann::json;
 
 // --- 定数定義 ---
-const double TARGET_SAMPLE_RATE = 48000.0;
+const double TARGET_SAMPLE_RATE = 192000.0; // 48kHzから192kHzへ変更
 const unsigned int PROCESSING_BLOCK_SIZE = 512;
 const size_t RING_BUFFER_FRAMES = 8192;
 
@@ -253,7 +251,9 @@ private:
     double source_sample_rate_ = 0.0;
     long long total_frames_ = 0;
     PaStream* stream_ = nullptr;
-    std::atomic<PlaybackState> playback_state_{PlaybackState::STOPPED};
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    std::atomic<PlaybackState> playback_state_{PlaybackState::STOPPED}; // 初期化子を修正
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     mutable std::mutex state_mutex_;
     SRC_STATE* resampler_state_ = nullptr;
     double resampling_ratio_ = 1.0;
@@ -405,6 +405,7 @@ void registerAllEffects() {
     // Dynamics
     factory.registerEffect<AnalogSaturation>("analog_saturation");
     factory.registerEffect<MasteringLimiter>("mastering_limiter");
+    factory.registerEffect<MultibandCompressor>("multiband_compressor");
 
     // EQ and Harmonics
     factory.registerEffect<HarmonicEnhancer>("harmonic_enhancer");
