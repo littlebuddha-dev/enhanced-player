@@ -1,4 +1,4 @@
-# ./CMakeLists.txt - Simplified and Corrected with All Sources Listed
+# ./CMakeLists.txt - Intel/Apple Silicon 両対応の最終修正版
 cmake_minimum_required(VERSION 3.15)
 project(RealtimeSoundEnhancer VERSION 4.9)
 
@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 endif()
 
 # --- 依存関係の検索 ---
@@ -40,9 +40,7 @@ if(NOT FFTW3F_INCLUDE_DIR OR NOT FFTW3F_LIBRARY)
     message(FATAL_ERROR "fftw3f library not found. Please run 'brew install fftw'")
 endif()
 
-# --- ビルドターゲットと全ソースファイルの定義 ---
-# すべてのソースファイルを add_executable に直接リストアップする最も確実な方法
-# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+# --- 実行ファイルの定義 ---
 add_executable(realtime_enhancer
     main.cpp
     AudioDecoderFactory.cpp
@@ -50,9 +48,8 @@ add_executable(realtime_enhancer
     SndfileDecoder.cpp
     advanced_dynamics.cpp
     advanced_eq_harmonics.cpp
-    custom_effects.cpp # 新しいソースファイルを追加
+    custom_effects.cpp
 )
-# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
 # --- インクルードディレクトリの指定 ---
 target_include_directories(realtime_enhancer PRIVATE
@@ -65,14 +62,25 @@ target_include_directories(realtime_enhancer PRIVATE
     ${FFTW3F_INCLUDE_DIR}
 )
 
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 # --- ライブラリのリンク ---
-target_link_libraries(realtime_enhancer
+
+# pkg-configが見つけたライブラリのディレクトリをターゲットのリンカ検索パスに追加 (Modern CMake)
+target_link_directories(realtime_enhancer PRIVATE
+    ${SNDFILE_LIBRARY_DIRS}
+    ${SAMPLERATE_LIBRARY_DIRS}
+    ${PORTAUDIO_LIBRARY_DIRS}
+)
+
+# ライブラリ本体をリンク
+target_link_libraries(realtime_enhancer PRIVATE
     ${SNDFILE_LIBRARIES}
     ${SAMPLERATE_LIBRARIES}
     ${PORTAUDIO_LIBRARIES}
     ${MPG123_LIBRARY}
     ${FFTW3F_LIBRARY}
 )
+# ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
 # --- ビルド後のカスタムコマンド ---
 add_custom_command(

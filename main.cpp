@@ -1,3 +1,4 @@
+// littlebuddha-dev/enhanced-player/enhanced-player-744f95724d41f28920f8e85526e5351483dfe8fc/main.cpp の置き換え
 // ./main.cpp - Final Corrected Version with Re-engineered Audio Engine and Enhanced Logging
 #include <iostream>
 #include <vector>
@@ -31,9 +32,12 @@
 using json = nlohmann::json;
 
 // --- 定数定義 ---
-const double TARGET_SAMPLE_RATE = 192000.0; // 48kHzから192kHzへ変更
+const double TARGET_SAMPLE_RATE = 192000.0;
 const unsigned int PROCESSING_BLOCK_SIZE = 512;
-const size_t RING_BUFFER_FRAMES = 8192;
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+// バッファアンダーフローを防ぐため、リングバッファのサイズを4倍に増量
+const size_t RING_BUFFER_FRAMES = 32768;
+// ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
 
 // --- ログ出力用マクロ ---
 #define LOG_INFO(msg) std::cout << "[INFO] " << msg << std::endl
@@ -252,7 +256,8 @@ private:
     long long total_frames_ = 0;
     PaStream* stream_ = nullptr;
     // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
-    std::atomic<PlaybackState> playback_state_{PlaybackState::STOPPED}; // 初期化子を修正
+    // atomic変数の初期化方法を = に統一
+    std::atomic<PlaybackState> playback_state_ = PlaybackState::STOPPED;
     // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     mutable std::mutex state_mutex_;
     SRC_STATE* resampler_state_ = nullptr;
@@ -286,7 +291,10 @@ void RealtimeAudioEngine::init_portaudio() {
     output_parameters.hostApiSpecificStreamInfo = nullptr;
 
     LOG_INFO("Opening PortAudio stream with " << channels_ << " channels at " << TARGET_SAMPLE_RATE << " Hz.");
-    PaError err = Pa_OpenStream(&stream_, nullptr, &output_parameters, TARGET_SAMPLE_RATE, paFramesPerBufferUnspecified, paClipOff, paCallback, this);
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↓修正開始◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
+    // タイミング安定化のため、コールバックのバッファサイズを固定値に設定
+    PaError err = Pa_OpenStream(&stream_, nullptr, &output_parameters, TARGET_SAMPLE_RATE, PROCESSING_BLOCK_SIZE, paClipOff, paCallback, this);
+    // ◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️↑修正終わり◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️◾️
     if (err != paNoError) {
         throw std::runtime_error("Failed to open audio stream: " + std::string(Pa_GetErrorText(err)));
     }
